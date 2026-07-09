@@ -49,8 +49,88 @@ def test_create_job():
     assert response.status_code == 201
     data = response.json()
     assert data["prompt"] == "Tell me a joke"
-    assert data["status"] == "queue"
+    assert data["status"] == "awaiting_input"
+    assert "missing" in data["response"].lower()
     assert data["id"] is not None
+
+def test_car_hire_agent_flow_with_mock():
+    # Mocking the agent to simulate complete details and success path
+    from unittest.mock import patch
+    mock_result = {
+        "prompt": "find me car hire in Brisbane for 17 July to 21 July",
+        "location": "Brisbane",
+        "start_date": "2026-07-17",
+        "end_date": "2026-07-21",
+        "missing_fields": [],
+        "next_question": None,
+        "scraped_deals": [
+            {
+                "provider": "Kayak.com (via Hertz)",
+                "location": "Brisbane",
+                "car_model": "Toyota Corolla",
+                "price_per_day": 45.0,
+                "total_price": 180.0,
+                "url": "mock_url"
+            }
+        ],
+        "final_response": "Here is the best deal for Brisbane: Toyota Corolla at $45/day."
+    }
+    
+    with patch("app.routes.llm_job.car_hire_agent.invoke", return_value=mock_result):
+        payload = {"prompt": "find me car hire in Brisbane for 17 July to 21 July"}
+        response = client.post("/llm-job", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "done"
+        assert "Toyota Corolla" in data["response"]
+        assert data["state"] == {"location": "Brisbane", "start_date": "2026-07-17", "end_date": "2026-07-21"}
+
+def test_car_hire_agent_hitl_flow_with_mock():
+    from unittest.mock import patch
+    
+    # 1. First turn: User asks for car hire but missing location
+    mock_first_turn = {
+        "prompt": "find me car hire for 17 July to 21 July",
+        "location": None,
+        "start_date": "2026-07-17",
+        "end_date": "2026-07-21",
+        "missing_fields": ["location"],
+        "next_question": "Could you please provide the location?",
+        "scraped_deals": None,
+        "final_response": None
+    }
+    
+    # 2. Second turn: User provides location -> completes search
+    mock_second_turn = {
+        "prompt": "Brisbane",
+        "location": "Brisbane",
+        "start_date": "2026-07-17",
+        "end_date": "2026-07-21",
+        "missing_fields": [],
+        "next_question": None,
+        "scraped_deals": [],
+        "final_response": "Found deals for Brisbane!"
+    }
+    
+    with patch("app.routes.llm_job.car_hire_agent.invoke") as mock_invoke:
+        mock_invoke.return_value = mock_first_turn
+        payload = {"prompt": "find me car hire for 17 July to 21 July"}
+        response = client.post("/llm-job", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "awaiting_input"
+        assert data["response"] == "Could you please provide the location?"
+        job_id = data["id"]
+        
+        # Simulating user response to patch
+        mock_invoke.return_value = mock_second_turn
+        response = client.patch(f"/llm-job/{job_id}", json={"answer": "Brisbane"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "done"
+        assert data["response"] == "Found deals for Brisbane!"
+        assert data["state"] == {"location": "Brisbane", "start_date": "2026-07-17", "end_date": "2026-07-21"}
+
 
 def test_list_jobs_default_filters():
     response = client.get("/llm-job")

@@ -19,6 +19,10 @@ class LLMJobUpdate(BaseModel):
 def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):
     job = LLMJob(prompt=payload.prompt, status="queue")
     session.add(job)
+
+
+    # use Langfuse 
+
     session.commit()
     session.refresh(job)
     return job
