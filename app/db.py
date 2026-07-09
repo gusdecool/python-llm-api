@@ -4,11 +4,12 @@ from app.config import DATABASE_URL
 from app.log import logger
 from app.models import LLMJob
 
+
 # Create the SQLAlchemy engine for SQLModel
 # We disable same-thread check for SQLite to allow multiple async/multithreaded requests
 engine = create_engine(
     DATABASE_URL, 
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args={"check_same_thread": False} if DATABASE_URL and DATABASE_URL.startswith("sqlite") else {},
     echo=True  # Prints generated SQL to console (good for development)
 )
 

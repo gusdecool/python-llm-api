@@ -1,9 +1,12 @@
 from typing import TypedDict, Optional, List, Dict, Any
 from datetime import datetime
+import os
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_litellm import ChatLiteLLM
 from langgraph.graph import StateGraph, START, END
+from app.config import GEMINI_API_KEY
+
 
 # Define the state shape
 class CarHireState(TypedDict):
@@ -16,19 +19,20 @@ class CarHireState(TypedDict):
     scraped_deals: Optional[List[Dict[str, Any]]]
     final_response: Optional[str]
 
+
 # Structured output Pydantic schema for parsing parameters
 class ExtractedDetails(BaseModel):
     location: Optional[str] = Field(None, description="The city or airport code for pick-up, e.g. Brisbane, Sydney")
     start_date: Optional[str] = Field(None, description="Format: YYYY-MM-DD. Start/pick-up date of the rental.")
     end_date: Optional[str] = Field(None, description="Format: YYYY-MM-DD. End/drop-off date of the rental.")
 
+
 # Node 1: Extract Parameters from input prompt
 def extract_parameters(state: CarHireState) -> Dict[str, Any]:
-    import os
-    if not os.environ.get("GEMINI_API_KEY") and not os.environ.get("GOOGLE_API_KEY"):
+    if not GEMINI_API_KEY:
         return {}
         
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
+    llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", temperature=0)
     structured_llm = llm.with_structured_output(ExtractedDetails)
     
     prompt_template = ChatPromptTemplate.from_messages([
@@ -56,6 +60,7 @@ def extract_parameters(state: CarHireState) -> Dict[str, Any]:
         "end_date": end_date
     }
 
+
 # Node 2: Validate extracted parameters
 def validate_parameters(state: CarHireState) -> Dict[str, Any]:
     missing = []
@@ -67,12 +72,11 @@ def validate_parameters(state: CarHireState) -> Dict[str, Any]:
         missing.append("end_date")
         
     if missing:
-        import os
-        if not os.environ.get("GEMINI_API_KEY") and not os.environ.get("GOOGLE_API_KEY"):
+        if GEMINI_API_KEY:
             question = f"Could you please provide the missing details: {', '.join(missing)}?"
             return {"missing_fields": missing, "next_question": question}
 
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
+        llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", temperature=0.2)
         question_prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful car rental assistant. The user wants to search for car hire, but some fields are missing: {missing}. Ask the user politely to provide the missing information. Do not ask for fields that are not in the list. Keep it short and friendly."),
         ])
@@ -84,6 +88,7 @@ def validate_parameters(state: CarHireState) -> Dict[str, Any]:
         return {"missing_fields": missing, "next_question": question}
         
     return {"missing_fields": [], "next_question": None}
+
 
 # Node 3: Search vehicle deals (Mock scraping Kayak & Carhire.com.au)
 def search_vehicle(state: CarHireState) -> Dict[str, Any]:
@@ -129,10 +134,10 @@ def search_vehicle(state: CarHireState) -> Dict[str, Any]:
     ]
     return {"scraped_deals": deals}
 
+
 # Node 4: Synthesize response
 def synthesize_response(state: CarHireState) -> Dict[str, Any]:
-    import os
-    if not os.environ.get("GEMINI_API_KEY") and not os.environ.get("GOOGLE_API_KEY"):
+    if GEMINI_API_KEY:
         # Fallback if model unconfigured
         table = "| Provider | Car Model | Price/Day | Total Price | Link |\n|---|---|---|---|---|\n"
         for deal in state["scraped_deals"]:
@@ -140,7 +145,7 @@ def synthesize_response(state: CarHireState) -> Dict[str, Any]:
         response = f"Here are the deals found for {state['location']} from {state['start_date']} to {state['end_date']}:\n\n{table}"
         return {"final_response": response}
 
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
+    llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", temperature=0.2)
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", "You are a car hire comparison assistant. Based on the scraped vehicle deals, present the user with a formatted markdown summary/recommendation table including links to book. Highlight the best deals. Make sure the table looks professional."),
         ("user", "Deals: {deals}")
@@ -156,11 +161,13 @@ def synthesize_response(state: CarHireState) -> Dict[str, Any]:
         response = f"Here are the deals found for {state['location']} from {state['start_date']} to {state['end_date']}:\n\n{table}"
     return {"final_response": response}
 
+
 # Conditional routing logic
 def route_after_validation(state: CarHireState):
     if state.get("missing_fields"):
         return "ask_user"
     return "search"
+
 
 # Construct the graph
 workflow = StateGraph(CarHireState)
