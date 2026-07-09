@@ -49,8 +49,10 @@ def extract_parameters(state: CarHireState) -> Dict[str, Any]:
         handler = get_langfuse_handler()
         config = {
             "callbacks": [handler],
-            "tags": ["car_hire_agent", "extract_parameters"],
-            "metadata": {"langfuse_session_id": get_session_id()}
+            "metadata": {
+                "langfuse_session_id": get_session_id(),
+                "langfuse_tags": ["car_hire_agent", "extract_parameters"]
+            }
         } if handler else {}
         extracted = chain.invoke({"prompt": state["prompt"], "current_date": curr_date}, config=config)
     except Exception as e:
@@ -94,8 +96,10 @@ def validate_parameters(state: CarHireState) -> Dict[str, Any]:
             handler = get_langfuse_handler()
             config = {
                 "callbacks": [handler],
-                "tags": ["car_hire_agent", "validate_parameters"],
-                "metadata": {"langfuse_session_id": get_session_id()}
+                "metadata": {
+                    "langfuse_session_id": get_session_id(),
+                    "langfuse_tags": ["car_hire_agent", "validate_parameters"]
+                }
             } if handler else {}
             question = chain.invoke({"missing": ", ".join(missing)}, config=config).content
         except Exception:
@@ -171,8 +175,10 @@ def synthesize_response(state: CarHireState) -> Dict[str, Any]:
         handler = get_langfuse_handler()
         config = {
             "callbacks": [handler],
-            "tags": ["car_hire_agent", "synthesize_response"],
-            "metadata": {"langfuse_session_id": get_session_id()}
+            "metadata": {
+                "langfuse_session_id": get_session_id(),
+                "langfuse_tags": ["car_hire_agent", "synthesize_response"]
+            }
         } if handler else {}
         response = chain.invoke({"deals": str(state["scraped_deals"])}, config=config).content
     except Exception:

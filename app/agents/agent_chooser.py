@@ -25,7 +25,7 @@ log = get_logger('agent-chooser')
 
 def choose_agent(prompt: str) -> ChooserResult:
     log.info('chosing agent')
-    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0, log=False)
+    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0)
 
     structured_llm = llm.with_structured_output(ChooserResult)
 
@@ -45,8 +45,10 @@ def choose_agent(prompt: str) -> ChooserResult:
         handler = get_langfuse_handler()
         config = {
             "callbacks": [handler],
-            "tags": ["agent_chooser", "choose_agent"],
-            "metadata": {"langfuse_session_id": get_session_id()}
+            "metadata": {
+                "langfuse_session_id": get_session_id(),
+                "langfuse_tags": ["agent_chooser", "choose_agent"]
+            }
         } if handler else {}
         result = chain.invoke({"prompt": prompt}, config=config)
         if result.action == "unsupported":

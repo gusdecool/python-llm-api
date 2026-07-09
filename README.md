@@ -57,37 +57,6 @@ FastAPI automatically generates interactive API documentation. Once the server i
 
 ---
 
-## Testing the Endpoints Manually
-
-### GET Request: Retrieve all items
-```bash
-curl -X GET http://127.0.0.1:8000/items
-```
-
-### POST Request: Create a new item (Valid)
-```bash
-curl -X POST http://127.0.0.1:8000/items \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Custom Product",
-    "description": "An item created via cURL",
-    "price": 125.00,
-    "tax": 10.00
-  }'
-```
-
-### POST Request: Create a new item (Invalid - to see Pydantic validation error)
-```bash
-curl -X POST http://127.0.0.1:8000/items \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Invalid Product",
-    "price": -10.00
-  }'
-```
-
----
-
 ## Running Automated Tests
 
 Run the test suite using `pytest` with `PYTHONPATH` set to the project root:
