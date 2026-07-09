@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from app.log import logger
 from app.db import init_db
+from app.routes.llm_job import router as llm_job_router
 
 # Configure logging
 # logging.basicConfig(
@@ -30,6 +31,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+app.include_router(llm_job_router)
+
 
 
 @app.get("/", tags=["Root"])
