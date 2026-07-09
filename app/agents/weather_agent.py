@@ -10,6 +10,7 @@ from langgraph.graph import StateGraph, START, END
 from app.config import OPEN_WEATHER_API_KEY
 from app.log import get_logger
 from app.langfuse import get_langfuse_handler
+from app.util import get_session_id
 
 log = get_logger("weather-agent")
 
@@ -51,7 +52,11 @@ def extract_parameters(state: WeatherState) -> Dict[str, Any]:
     
     try:
         handler = get_langfuse_handler()
-        config = {"callbacks": [handler], "tags": ["weather_agent", "extract_parameters"]} if handler else {}
+        config = {
+            "callbacks": [handler],
+            "tags": ["weather_agent", "extract_parameters"],
+            "metadata": {"langfuse_session_id": get_session_id()}
+        } if handler else {}
         extracted = chain.invoke({"prompt": state["prompt"], "current_date": curr_date}, config=config)
     except Exception:
         return {}
@@ -83,7 +88,11 @@ def validate_parameters(state: WeatherState) -> Dict[str, Any]:
         chain = question_prompt | llm
         try:
             handler = get_langfuse_handler()
-            config = {"callbacks": [handler], "tags": ["weather_agent", "validate_parameters"]} if handler else {}
+            config = {
+                "callbacks": [handler],
+                "tags": ["weather_agent", "validate_parameters"],
+                "metadata": {"langfuse_session_id": get_session_id()}
+            } if handler else {}
             question = chain.invoke({}, config=config).content
         except Exception:
             question = f"Could you please provide the missing details: {', '.join(missing)}?"
@@ -140,7 +149,11 @@ def synthesize_response(state: WeatherState) -> Dict[str, Any]:
     chain = prompt_template | llm
     try:
         handler = get_langfuse_handler()
-        config = {"callbacks": [handler], "tags": ["weather_agent", "synthesize_response"]} if handler else {}
+        config = {
+            "callbacks": [handler],
+            "tags": ["weather_agent", "synthesize_response"],
+            "metadata": {"langfuse_session_id": get_session_id()}
+        } if handler else {}
         response = chain.invoke({"weather_data": str(weather)}, config=config).content
     except Exception:
         response = f"The weather in {weather['city']} is currently {weather['condition']} with a temperature of {weather['temp']}°C (feels like {weather['feels_like']}°C), humidity at {weather['humidity']}%, and wind speed at {weather['wind_speed']} m/s."

@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_litellm import ChatLiteLLM
 from app.log import get_logger
 from app.langfuse import get_langfuse_handler
+from app.util import get_session_id
 
 
 class ChooserResult(BaseModel):
@@ -42,7 +43,11 @@ def choose_agent(prompt: str) -> ChooserResult:
     chain = prompt_template | structured_llm
     try:
         handler = get_langfuse_handler()
-        config = {"callbacks": [handler], "tags": ["agent_chooser", "choose_agent"]} if handler else {}
+        config = {
+            "callbacks": [handler],
+            "tags": ["agent_chooser", "choose_agent"],
+            "metadata": {"langfuse_session_id": get_session_id()}
+        } if handler else {}
         result = chain.invoke({"prompt": prompt}, config=config)
         if result.action == "unsupported":
             log.info("Iam dumb, I dont know")

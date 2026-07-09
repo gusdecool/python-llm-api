@@ -6,6 +6,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_litellm import ChatLiteLLM
 from langgraph.graph import StateGraph, START, END
 from app.config import GEMINI_API_KEY
+from app.langfuse import get_langfuse_handler
+from app.util import get_session_id
 
 
 # Define the state shape
@@ -44,7 +46,13 @@ def extract_parameters(state: CarHireState) -> Dict[str, Any]:
     curr_date = datetime.now().strftime("%Y-%m-%d")
     
     try:
-        extracted = chain.invoke({"prompt": state["prompt"], "current_date": curr_date})
+        handler = get_langfuse_handler()
+        config = {
+            "callbacks": [handler],
+            "tags": ["car_hire_agent", "extract_parameters"],
+            "metadata": {"langfuse_session_id": get_session_id()}
+        } if handler else {}
+        extracted = chain.invoke({"prompt": state["prompt"], "current_date": curr_date}, config=config)
     except Exception as e:
         # Fallback if API fails or is unconfigured
         return {}
@@ -83,7 +91,13 @@ def validate_parameters(state: CarHireState) -> Dict[str, Any]:
         ])
         chain = question_prompt | llm
         try:
-            question = chain.invoke({"missing": ", ".join(missing)}).content
+            handler = get_langfuse_handler()
+            config = {
+                "callbacks": [handler],
+                "tags": ["car_hire_agent", "validate_parameters"],
+                "metadata": {"langfuse_session_id": get_session_id()}
+            } if handler else {}
+            question = chain.invoke({"missing": ", ".join(missing)}, config=config).content
         except Exception:
             question = f"Could you please provide the missing details: {', '.join(missing)}?"
         return {"missing_fields": missing, "next_question": question}
@@ -154,7 +168,13 @@ def synthesize_response(state: CarHireState) -> Dict[str, Any]:
     ])
     chain = prompt_template | llm
     try:
-        response = chain.invoke({"deals": str(state["scraped_deals"])}).content
+        handler = get_langfuse_handler()
+        config = {
+            "callbacks": [handler],
+            "tags": ["car_hire_agent", "synthesize_response"],
+            "metadata": {"langfuse_session_id": get_session_id()}
+        } if handler else {}
+        response = chain.invoke({"deals": str(state["scraped_deals"])}, config=config).content
     except Exception:
         # Fallback if model fails
         table = "| Provider | Car Model | Price/Day | Total Price | Link |\n|---|---|---|---|---|\n"
