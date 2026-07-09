@@ -23,3 +23,7 @@ Every coding agent working in this repository must strictly adhere to the follow
 - Use the `lifespan` event handler instead of the deprecated `@app.on_event("startup")` or `"shutdown"`.
 - Use Pydantic v2's `.model_dump()` instead of the deprecated `.dict()`.
 - Use Python's built-in `typing.Annotated` for route dependencies and metadata (e.g. `conn: Annotated[Session, Depends(get_session)]`).
+
+## 5. Modern Python Conventions
+- Use config from `app.config` instead of `os.environ` directly to map all the config required
+- All prompt must be send to Langfuse for observavibility.

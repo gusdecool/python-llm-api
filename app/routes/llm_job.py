@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from langfuse.langchain import CallbackHandler
 from app.db import get_session
 from app.models import LLMJob
-from app.agents import car_hire_agent
+from app.agents import car_hire_agent, weather_agent, choose_agent
 from app.config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL
 
 
@@ -42,41 +42,84 @@ def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(job)
 
-    # Invoke agent with Langfuse observability callbacks
+    # Route using agent_chooser
+    choice = choose_agent(payload.prompt)
+
+    if choice.action == "direct_answer" or choice.action == "unsupported":
+        job.status = "done"
+        job.response = choice.direct_response
+        job.state = {"agent": choice.action}
+        job.responded_at = datetime.utcnow()
+        session.add(job)
+        session.commit()
+        session.refresh(job)
+        return job
+
+    # Invoke appropriate agent with Langfuse observability callbacks
     handler = get_langfuse_handler()
     config = {"callbacks": [handler]} if handler else {}
-    
-    initial_state = {
-        "prompt": payload.prompt,
-        "location": None,
-        "start_date": None,
-        "end_date": None,
-        "missing_fields": [],
-        "next_question": None,
-        "scraped_deals": None,
-        "final_response": None
-    }
-    
-    try:
-        result = car_hire_agent.invoke(initial_state, config=config)
-        
-        if result.get("next_question"):
-            job.status = "awaiting_input"
-            job.response = result["next_question"]
-        else:
-            job.status = "done"
-            job.response = result.get("final_response") or "Done"
-            job.responded_at = datetime.utcnow()
-            
-        job.state = {
-            "location": result.get("location"),
-            "start_date": result.get("start_date"),
-            "end_date": result.get("end_date")
+
+    if choice.action == "weather_agent":
+        initial_state = {
+            "prompt": payload.prompt,
+            "location": None,
+            "date": None,
+            "missing_fields": [],
+            "next_question": None,
+            "weather_data": None,
+            "final_response": None
         }
-    except Exception as e:
-        job.status = "error"
-        job.response = f"Agent failed: {str(e)}"
-        job.responded_at = datetime.utcnow()
+        try:
+            result = weather_agent.invoke(initial_state, config=config)
+            if result.get("next_question"):
+                job.status = "awaiting_input"
+                job.response = result["next_question"]
+            else:
+                job.status = "done"
+                job.response = result.get("final_response") or "Done"
+                job.responded_at = datetime.utcnow()
+            job.state = {
+                "agent": "weather_agent",
+                "location": result.get("location"),
+                "date": result.get("date")
+            }
+        except Exception as e:
+            job.status = "error"
+            job.response = f"Weather agent failed: {str(e)}"
+            job.responded_at = datetime.utcnow()
+            job.state = {"agent": "weather_agent"}
+    else:
+        # Default to car_hire_agent
+        initial_state = {
+            "prompt": payload.prompt,
+            "location": None,
+            "start_date": None,
+            "end_date": None,
+            "missing_fields": [],
+            "next_question": None,
+            "scraped_deals": None,
+            "final_response": None
+        }
+        try:
+            result = car_hire_agent.invoke(initial_state, config=config)
+            if result.get("next_question"):
+                job.status = "awaiting_input"
+                job.response = result["next_question"]
+            else:
+                job.status = "done"
+                job.response = result.get("final_response") or "Done"
+                job.responded_at = datetime.utcnow()
+            job.state = {
+                "agent": "car_hire_agent",
+                "location": result.get("location"),
+                "start_date": result.get("start_date"),
+                "end_date": result.get("end_date")
+            }
+        except Exception as e:
+            job.status = "error"
+            job.response = f"Car hire agent failed: {str(e)}"
+            job.responded_at = datetime.utcnow()
+            job.state = {"agent": "car_hire_agent"}
 
     session.add(job)
     session.commit()
@@ -142,37 +185,67 @@ def update_job(
         handler = get_langfuse_handler()
         config = {"callbacks": [handler]} if handler else {}
         
-        agent_state = {
-            "prompt": payload.answer,
-            "location": job.state.get("location") if job.state else None,
-            "start_date": job.state.get("start_date") if job.state else None,
-            "end_date": job.state.get("end_date") if job.state else None,
-            "missing_fields": [],
-            "next_question": None,
-            "scraped_deals": None,
-            "final_response": None
-        }
+        agent_name = job.state.get("agent") if job.state else "car_hire_agent"
         
-        try:
-            result = car_hire_agent.invoke(agent_state, config=config)
-            
-            if result.get("next_question"):
-                job.status = "awaiting_input"
-                job.response = result["next_question"]
-            else:
-                job.status = "done"
-                job.response = result.get("final_response") or "Done"
-                job.responded_at = datetime.utcnow()
-                
-            job.state = {
-                "location": result.get("location"),
-                "start_date": result.get("start_date"),
-                "end_date": result.get("end_date")
+        if agent_name == "weather_agent":
+            agent_state = {
+                "prompt": payload.answer,
+                "location": job.state.get("location") if job.state else None,
+                "date": job.state.get("date") if job.state else None,
+                "missing_fields": [],
+                "next_question": None,
+                "weather_data": None,
+                "final_response": None
             }
-        except Exception as e:
-            job.status = "error"
-            job.response = f"Agent failed: {str(e)}"
-            job.responded_at = datetime.utcnow()
+            try:
+                result = weather_agent.invoke(agent_state, config=config)
+                if result.get("next_question"):
+                    job.status = "awaiting_input"
+                    job.response = result["next_question"]
+                else:
+                    job.status = "done"
+                    job.response = result.get("final_response") or "Done"
+                    job.responded_at = datetime.utcnow()
+                job.state = {
+                    "agent": "weather_agent",
+                    "location": result.get("location"),
+                    "date": result.get("date")
+                }
+            except Exception as e:
+                job.status = "error"
+                job.response = f"Weather agent failed: {str(e)}"
+                job.responded_at = datetime.utcnow()
+        else:
+            # Default to car_hire_agent
+            agent_state = {
+                "prompt": payload.answer,
+                "location": job.state.get("location") if job.state else None,
+                "start_date": job.state.get("start_date") if job.state else None,
+                "end_date": job.state.get("end_date") if job.state else None,
+                "missing_fields": [],
+                "next_question": None,
+                "scraped_deals": None,
+                "final_response": None
+            }
+            try:
+                result = car_hire_agent.invoke(agent_state, config=config)
+                if result.get("next_question"):
+                    job.status = "awaiting_input"
+                    job.response = result["next_question"]
+                else:
+                    job.status = "done"
+                    job.response = result.get("final_response") or "Done"
+                    job.responded_at = datetime.utcnow()
+                job.state = {
+                    "agent": "car_hire_agent",
+                    "location": result.get("location"),
+                    "start_date": result.get("start_date"),
+                    "end_date": result.get("end_date")
+                }
+            except Exception as e:
+                job.status = "error"
+                job.response = f"Car hire agent failed: {str(e)}"
+                job.responded_at = datetime.utcnow()
             
     else:
         # standard update logic if answer is not provided

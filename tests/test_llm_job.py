@@ -18,10 +18,14 @@ def get_test_session():
     with Session(engine) as session:
         yield session
 
-# Override get_session dependency
-app.dependency_overrides[get_session] = get_test_session
+@pytest.fixture(autouse=True)
+def override_dependencies():
+    app.dependency_overrides[get_session] = get_test_session
+    yield
+    app.dependency_overrides.clear()
 
 client = TestClient(app)
+
 
 @pytest.fixture(autouse=True)
 def setup_and_teardown_db():
@@ -44,18 +48,40 @@ def setup_and_teardown_db():
 
 
 def test_create_job():
-    payload = {"prompt": "Tell me a joke"}
-    response = client.post("/llm-job", json=payload)
-    assert response.status_code == 201
-    data = response.json()
-    assert data["prompt"] == "Tell me a joke"
-    assert data["status"] == "awaiting_input"
-    assert "missing" in data["response"].lower()
-    assert data["id"] is not None
+    from unittest.mock import patch
+    from app.agents.agent_chooser import ChooserResult
+    
+    mock_choice = ChooserResult(action="car_hire_agent")
+    mock_agent_result = {
+        "prompt": "Tell me a joke",
+        "location": None,
+        "start_date": None,
+        "end_date": None,
+        "missing_fields": ["location"],
+        "next_question": "Could you please provide the missing details: location?",
+        "scraped_deals": None,
+        "final_response": None
+    }
+
+    
+    with patch("app.routes.llm_job.choose_agent", return_value=mock_choice), \
+         patch("app.routes.llm_job.car_hire_agent.invoke", return_value=mock_agent_result):
+        payload = {"prompt": "Tell me a joke"}
+        response = client.post("/llm-job", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["prompt"] == "Tell me a joke"
+        assert data["status"] == "awaiting_input"
+        assert "missing" in data["response"].lower()
+        assert data["id"] is not None
+
 
 def test_car_hire_agent_flow_with_mock():
     # Mocking the agent to simulate complete details and success path
     from unittest.mock import patch
+    from app.agents.agent_chooser import ChooserResult
+    
+    mock_choice = ChooserResult(action="car_hire_agent")
     mock_result = {
         "prompt": "find me car hire in Brisbane for 17 July to 21 July",
         "location": "Brisbane",
@@ -76,17 +102,22 @@ def test_car_hire_agent_flow_with_mock():
         "final_response": "Here is the best deal for Brisbane: Toyota Corolla at $45/day."
     }
     
-    with patch("app.routes.llm_job.car_hire_agent.invoke", return_value=mock_result):
+    with patch("app.routes.llm_job.choose_agent", return_value=mock_choice), \
+         patch("app.routes.llm_job.car_hire_agent.invoke", return_value=mock_result):
         payload = {"prompt": "find me car hire in Brisbane for 17 July to 21 July"}
         response = client.post("/llm-job", json=payload)
         assert response.status_code == 201
         data = response.json()
         assert data["status"] == "done"
         assert "Toyota Corolla" in data["response"]
-        assert data["state"] == {"location": "Brisbane", "start_date": "2026-07-17", "end_date": "2026-07-21"}
+        assert data["state"] == {"agent": "car_hire_agent", "location": "Brisbane", "start_date": "2026-07-17", "end_date": "2026-07-21"}
+
 
 def test_car_hire_agent_hitl_flow_with_mock():
     from unittest.mock import patch
+    from app.agents.agent_chooser import ChooserResult
+    
+    mock_choice = ChooserResult(action="car_hire_agent")
     
     # 1. First turn: User asks for car hire but missing location
     mock_first_turn = {
@@ -112,7 +143,8 @@ def test_car_hire_agent_hitl_flow_with_mock():
         "final_response": "Found deals for Brisbane!"
     }
     
-    with patch("app.routes.llm_job.car_hire_agent.invoke") as mock_invoke:
+    with patch("app.routes.llm_job.choose_agent", return_value=mock_choice), \
+         patch("app.routes.llm_job.car_hire_agent.invoke") as mock_invoke:
         mock_invoke.return_value = mock_first_turn
         payload = {"prompt": "find me car hire for 17 July to 21 July"}
         response = client.post("/llm-job", json=payload)
@@ -129,7 +161,8 @@ def test_car_hire_agent_hitl_flow_with_mock():
         data = response.json()
         assert data["status"] == "done"
         assert data["response"] == "Found deals for Brisbane!"
-        assert data["state"] == {"location": "Brisbane", "start_date": "2026-07-17", "end_date": "2026-07-21"}
+        assert data["state"] == {"agent": "car_hire_agent", "location": "Brisbane", "start_date": "2026-07-17", "end_date": "2026-07-21"}
+
 
 
 def test_list_jobs_default_filters():

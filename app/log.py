@@ -11,3 +11,10 @@ logging.basicConfig(
 
 logger = logging.getLogger("llm-api")
 
+
+def get_logger(name: str | None = None) -> logging.Logger:
+    """
+    get logger with standarized format, default name to "llm-api"
+    """
+
+    return logging.getLogger(name or "llm-api")
