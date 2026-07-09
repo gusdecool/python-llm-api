@@ -9,6 +9,7 @@ from langchain_litellm import ChatLiteLLM
 from langgraph.graph import StateGraph, START, END
 from app.config import OPEN_WEATHER_API_KEY
 from app.log import get_logger
+from app.langfuse import get_langfuse_handler
 
 log = get_logger("weather-agent")
 
@@ -49,7 +50,9 @@ def extract_parameters(state: WeatherState) -> Dict[str, Any]:
     curr_date = datetime.now().strftime("%Y-%m-%d")
     
     try:
-        extracted = chain.invoke({"prompt": state["prompt"], "current_date": curr_date})
+        handler = get_langfuse_handler()
+        config = {"callbacks": [handler], "tags": ["weather_agent", "extract_parameters"]} if handler else {}
+        extracted = chain.invoke({"prompt": state["prompt"], "current_date": curr_date}, config=config)
     except Exception:
         return {}
 
@@ -79,7 +82,9 @@ def validate_parameters(state: WeatherState) -> Dict[str, Any]:
         ])
         chain = question_prompt | llm
         try:
-            question = chain.invoke({}).content
+            handler = get_langfuse_handler()
+            config = {"callbacks": [handler], "tags": ["weather_agent", "validate_parameters"]} if handler else {}
+            question = chain.invoke({}, config=config).content
         except Exception:
             question = f"Could you please provide the missing details: {', '.join(missing)}?"
         return {"missing_fields": missing, "next_question": question}
@@ -109,7 +114,7 @@ def search_weather(state: WeatherState) -> Dict[str, Any]:
         except Exception:
             pass
             
-    # Fallback to mock weather data
+    # Fallback to mock weather data TODO remove mock data
     return {"weather_data": {
         "temp": 22.5,
         "feels_like": 21.0,
@@ -134,7 +139,9 @@ def synthesize_response(state: WeatherState) -> Dict[str, Any]:
     ])
     chain = prompt_template | llm
     try:
-        response = chain.invoke({"weather_data": str(weather)}).content
+        handler = get_langfuse_handler()
+        config = {"callbacks": [handler], "tags": ["weather_agent", "synthesize_response"]} if handler else {}
+        response = chain.invoke({"weather_data": str(weather)}, config=config).content
     except Exception:
         response = f"The weather in {weather['city']} is currently {weather['condition']} with a temperature of {weather['temp']}°C (feels like {weather['feels_like']}°C), humidity at {weather['humidity']}%, and wind speed at {weather['wind_speed']} m/s."
     return {"final_response": response}

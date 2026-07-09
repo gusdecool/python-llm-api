@@ -5,6 +5,7 @@ import os
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_litellm import ChatLiteLLM
 from app.log import get_logger
+from app.langfuse import get_langfuse_handler
 
 
 class ChooserResult(BaseModel):
@@ -23,18 +24,6 @@ log = get_logger('agent-chooser')
 
 def choose_agent(prompt: str) -> ChooserResult:
     log.info('chosing agent')
-    if not GEMINI_API_KEY:
-        # Fallback if no LLM config: do basic keyword routing
-        lower = prompt.lower()
-        if "car" in lower or "hire" in lower or "rent" in lower:
-            return ChooserResult(action="car_hire_agent")
-        elif "weather" in lower or "temp" in lower or "rain" in lower or "forecast" in lower:
-            return ChooserResult(action="weather_agent")
-        elif "mc2" in lower or "mc^2" in lower or "genius" in lower:
-            return ChooserResult(action="direct_answer", direct_response="E=mc² is mass-energy equivalence.")
-        else:
-            return ChooserResult(action="unsupported", direct_response="I can not do that at the moment")
-
     llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0, log=False)
 
     structured_llm = llm.with_structured_output(ChooserResult)
@@ -52,8 +41,11 @@ def choose_agent(prompt: str) -> ChooserResult:
 
     chain = prompt_template | structured_llm
     try:
-        result = chain.invoke({"prompt": prompt})
+        handler = get_langfuse_handler()
+        config = {"callbacks": [handler], "tags": ["agent_chooser", "choose_agent"]} if handler else {}
+        result = chain.invoke({"prompt": prompt}, config=config)
         if result.action == "unsupported":
+            log.info("Iam dumb, I dont know")
             result.direct_response = "I can not do that at the moment"
         return result
     except Exception:

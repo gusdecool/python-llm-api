@@ -1,6 +1,8 @@
+from app.log import get_logger
 import sys
 from app.agents import choose_agent, car_hire_agent, weather_agent
 
+log = get_logger("cli-main")
 
 def run_car_hire_flow(initial_prompt: str) -> None:
     state = {
@@ -102,7 +104,8 @@ def main() -> None:
             
         choice = choose_agent(prompt)
         
-        if choice.action == "direct_answer" or choice.action == "unsupported":
+        if choice.action == "direct_answer":
+            log.info("agent can direct answer")
             print(f"\nAgent: {choice.direct_response}")
         elif choice.action == "weather_agent":
             print("\n[Routing to Weather Agent...]")
@@ -110,6 +113,8 @@ def main() -> None:
         elif choice.action == "car_hire_agent":
             print("\n[Routing to Car Hire Agent...]")
             run_car_hire_flow(prompt)
+        elif choice.action == "unsupported":
+            print(f"\nAgent: {choice.direct_response}")
         else:
             print("\nAgent: I cannot do that at the moment.")
 

@@ -3,11 +3,10 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, select, col
 from pydantic import BaseModel, Field
-from langfuse.langchain import CallbackHandler
 from app.db import get_session
 from app.models import LLMJob
 from app.agents import car_hire_agent, weather_agent, choose_agent
-from app.config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_BASE_URL
+from app.langfuse import get_langfuse_handler
 
 
 router = APIRouter(prefix="/llm-job", tags=["LLM Job"])
@@ -21,18 +20,6 @@ class LLMJobUpdate(BaseModel):
     status: Optional[str] = Field(None, description="Status of the job")
     response: Optional[str] = Field(None, description="Response from the LLM")
     answer: Optional[str] = Field(None, description="User's answer to the follow-up question")
-
-
-def get_langfuse_handler() -> Optional[CallbackHandler]:
-    if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
-        import os
-        os.environ["LANGFUSE_PUBLIC_KEY"] = LANGFUSE_PUBLIC_KEY
-        os.environ["LANGFUSE_SECRET_KEY"] = LANGFUSE_SECRET_KEY
-        if LANGFUSE_BASE_URL:
-            os.environ["LANGFUSE_HOST"] = LANGFUSE_BASE_URL
-        return CallbackHandler(public_key=LANGFUSE_PUBLIC_KEY)
-    return None
-
 
 @router.post("", response_model=LLMJob, status_code=status.HTTP_201_CREATED)
 def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):

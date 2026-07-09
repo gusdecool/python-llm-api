@@ -27,3 +27,4 @@ Every coding agent working in this repository must strictly adhere to the follow
 ## 5. Modern Python Conventions
 - Use config from `app.config` instead of `os.environ` directly to map all the config required
 - All prompt must be send to Langfuse for observavibility.
+- Use `./venv/bin` to execute Python related command
