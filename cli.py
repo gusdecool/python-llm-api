@@ -1,3 +1,4 @@
+from app.app_exception import AppException
 from app.log import get_logger
 import sys
 from app.agents import choose_agent, car_hire_agent, weather_agent
@@ -94,29 +95,35 @@ def main() -> None:
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye!")
             break
-            
+
         if not prompt:
             continue
-            
+
         if prompt.lower() in ("exit", "quit"):
             print("Goodbye!")
             break
-            
+
         choice = choose_agent(prompt)
-        
-        if choice.action == "direct_answer":
-            log.info("agent can direct answer")
-            print(f"\nAgent: {choice.direct_response}")
-        elif choice.action == "weather_agent":
-            print("\n[Routing to Weather Agent...]")
-            run_weather_flow(prompt)
-        elif choice.action == "car_hire_agent":
-            print("\n[Routing to Car Hire Agent...]")
-            run_car_hire_flow(prompt)
-        elif choice.action == "unsupported":
-            print(f"\nAgent: {choice.direct_response}")
-        else:
-            print("\nAgent: I cannot do that at the moment.")
+
+        try :
+            if choice.action == "direct_answer":
+                log.info("agent can direct answer")
+                print(f"\nAgent: {choice.direct_response}")
+            elif choice.action == "weather_agent":
+                print("\n[Routing to Weather Agent...]")
+                run_weather_flow(prompt)
+            elif choice.action == "car_hire_agent":
+                print("\n[Routing to Car Hire Agent...]")
+                run_car_hire_flow(prompt)
+            elif choice.action == "unsupported":
+                print(f"\nAgent: {choice.direct_response}")
+            else:
+                print("\nAgent: I cannot do that at the moment.")
+        except AppException as e:
+            # print the error message and ask user input again
+            print("\nAgent: " + e.message)
+            prompt = input("\nYou: ").strip()
+
 
 
 if __name__ == "__main__":

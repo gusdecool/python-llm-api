@@ -1,3 +1,5 @@
+from app.app_exception import AppException
+from app.llm_model import get_gemini_2_5_flash_model
 from app.config import GEMINI_API_KEY
 from typing import TypedDict, Optional, List, Dict, Any
 from datetime import datetime
@@ -33,13 +35,9 @@ class WeatherExtractedDetails(BaseModel):
 
 # Node 1: Extract Parameters from input prompt
 def extract_parameters(state: WeatherState) -> Dict[str, Any]:
-    log.info("extracting parameters from input prompt")
+    log.info("extracting parameters from prompt")
     
-    # TODO change to dynamic API key chooser when we use dynamic model usage
-    if not GEMINI_API_KEY:
-        return {}
-        
-    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0)
+    llm = get_gemini_2_5_flash_model(temperature=0)
     structured_llm = llm.with_structured_output(WeatherExtractedDetails)
     
     prompt_template = ChatPromptTemplate.from_messages([
@@ -79,11 +77,7 @@ def validate_parameters(state: WeatherState) -> Dict[str, Any]:
         missing.append("location")
         
     if missing:
-        if not GEMINI_API_KEY:
-            question = f"Could you please provide the missing details: {', '.join(missing)}?"
-            return {"missing_fields": missing, "next_question": question}
-
-        llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
+        llm = get_gemini_2_5_flash_model(temperature=0.2)
         question_prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful weather assistant. The user wants to search for weather info, but the location is missing. Ask the user politely to provide the location. Keep it short and friendly."),
         ])
@@ -125,32 +119,21 @@ def search_weather(state: WeatherState) -> Dict[str, Any]:
                     "city": data["name"]
                 }}
         except Exception:
-            pass
-            
-    # Fallback to mock weather data TODO remove mock data
-    return {"weather_data": {
-        "temp": 22.5,
-        "feels_like": 21.0,
-        "condition": "scattered clouds",
-        "humidity": 65,
-        "wind_speed": 4.1,
-        "city": location
-    }}
+            raise AppException("failed to call open weather API, please check if service functional")
+    else:
+        raise AppException("please set OPEN_WEATHER_API_KEY in env")
 
 
 # Node 4: Synthesize response
 def synthesize_response(state: WeatherState) -> Dict[str, Any]:
     weather = state["weather_data"]
-    if not GEMINI_API_KEY:
-        response = f"The weather in {weather['city']} is currently {weather['condition']} with a temperature of {weather['temp']}°C (feels like {weather['feels_like']}°C), humidity at {weather['humidity']}%, and wind speed at {weather['wind_speed']} m/s."
-        return {"final_response": response}
-
-    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
+    llm = get_gemini_2_5_flash_model(temperature=0.2)
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", "You are a friendly weather assistant. Present the weather data to the user in a clean, helpful markdown summary."),
         ("user", "Weather Data: {weather_data}")
     ])
     chain = prompt_template | llm
+    
     try:
         handler = get_langfuse_handler()
         config = {
@@ -162,14 +145,14 @@ def synthesize_response(state: WeatherState) -> Dict[str, Any]:
         } if handler else {}
         response = chain.invoke({"weather_data": str(weather)}, config=config).content
     except Exception:
-        response = f"The weather in {weather['city']} is currently {weather['condition']} with a temperature of {weather['temp']}°C (feels like {weather['feels_like']}°C), humidity at {weather['humidity']}%, and wind speed at {weather['wind_speed']} m/s."
+        raise AppException("failed to synthesize weather response, try again")
+    
     return {"final_response": response}
 
 
 # Conditional routing logic
 def route_after_validation(state: WeatherState):
     if state.get("missing_fields"):
-        log.warning("missing info, ask_user")
         return "ask_user"
     return "search"
 

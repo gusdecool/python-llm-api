@@ -1,3 +1,4 @@
+from app.llm_model import get_gemini_2_5_flash_model
 from app.config import GEMINI_API_KEY
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -24,11 +25,24 @@ log = get_logger('agent-chooser')
 
 
 def choose_agent(prompt: str) -> ChooserResult:
+    """
+    Choose AI agent based on prompt.
+    If the request is can be answered directly, use 'direct_answer' action.
+    Otherwise if the request is something that we do not have tool for it, use 'unsupported' action.
+
+    Args:
+        prompt: User prompt
+
+    Returns:
+        ChooserResult with action and direct_response
+    """
+
     log.info('chosing agent')
-    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0)
+    llm = get_gemini_2_5_flash_model(temperature=0)
 
     structured_llm = llm.with_structured_output(ChooserResult)
 
+    # TODO use abstraction to build system prompt and agent discovery from app.agents.
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", (
             "You are an routing agent. Analyze the user prompt and decide the action:\n"
@@ -50,9 +64,10 @@ def choose_agent(prompt: str) -> ChooserResult:
                 "langfuse_tags": ["agent_chooser", "choose_agent"]
             }
         } if handler else {}
+
         result = chain.invoke({"prompt": prompt}, config=config)
+
         if result.action == "unsupported":
-            log.info("Iam dumb, I dont know")
             result.direct_response = "I can not do that at the moment"
         return result
     except Exception:
