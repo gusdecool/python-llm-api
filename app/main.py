@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 from app.log import logger
-from app.db import init_db, get_db_conn
+from app.db import init_db
 
 # Configure logging
 # logging.basicConfig(
@@ -37,7 +37,7 @@ def read_root() -> Dict[str, str]:
     """
     Root endpoint offering a simple welcome message.
     """
-    return {"message": "Welcome to the LLM API, I can do anything even tool calling."}
+    return {"message": "Welcome to the LLM API, I'm here to help'."}
 
 
 @app.post("/db-init", tags=["Database"])
@@ -46,8 +46,9 @@ def db_init() -> dict:
     Initialize the database.
     """
     logger.info("Initializing database...")
-    with get_db_conn() as conn:
-        init_db(conn)
+    init_db()
+    # with get_db_conn() as conn:
+    #     init_db(conn)
 
     return {"message": "Database initialized successfully."}
 
