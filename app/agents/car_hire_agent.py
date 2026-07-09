@@ -32,7 +32,7 @@ def extract_parameters(state: CarHireState) -> Dict[str, Any]:
     if not GEMINI_API_KEY:
         return {}
         
-    llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", api_key=GEMINI_API_KEY, temperature=0)
+    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0)
     structured_llm = llm.with_structured_output(ExtractedDetails)
     
     prompt_template = ChatPromptTemplate.from_messages([
@@ -77,7 +77,7 @@ def validate_parameters(state: CarHireState) -> Dict[str, Any]:
             return {"missing_fields": missing, "next_question": question}
 
 
-        llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
+        llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
         question_prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful car rental assistant. The user wants to search for car hire, but some fields are missing: {missing}. Ask the user politely to provide the missing information. Do not ask for fields that are not in the list. Keep it short and friendly."),
         ])
@@ -146,7 +146,7 @@ def synthesize_response(state: CarHireState) -> Dict[str, Any]:
         response = f"Here are the deals found for {state['location']} from {state['start_date']} to {state['end_date']}:\n\n{table}"
         return {"final_response": response}
 
-    llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
+    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
 
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", "You are a car hire comparison assistant. Based on the scraped vehicle deals, present the user with a formatted markdown summary/recommendation table including links to book. Highlight the best deals. Make sure the table looks professional."),

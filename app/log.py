@@ -8,6 +8,10 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
+# Suppress verbose LiteLLM logs
+logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+
+
 
 logger = logging.getLogger("llm-api")
 

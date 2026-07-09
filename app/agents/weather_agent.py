@@ -37,7 +37,7 @@ def extract_parameters(state: WeatherState) -> Dict[str, Any]:
     if not GEMINI_API_KEY:
         return {}
         
-    llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", api_key=GEMINI_API_KEY, temperature=0)
+    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0)
     structured_llm = llm.with_structured_output(WeatherExtractedDetails)
     
     prompt_template = ChatPromptTemplate.from_messages([
@@ -73,7 +73,7 @@ def validate_parameters(state: WeatherState) -> Dict[str, Any]:
             question = f"Could you please provide the missing details: {', '.join(missing)}?"
             return {"missing_fields": missing, "next_question": question}
 
-        llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
+        llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
         question_prompt = ChatPromptTemplate.from_messages([
             ("system", "You are a helpful weather assistant. The user wants to search for weather info, but the location is missing. Ask the user politely to provide the location. Keep it short and friendly."),
         ])
@@ -127,7 +127,7 @@ def synthesize_response(state: WeatherState) -> Dict[str, Any]:
         response = f"The weather in {weather['city']} is currently {weather['condition']} with a temperature of {weather['temp']}°C (feels like {weather['feels_like']}°C), humidity at {weather['humidity']}%, and wind speed at {weather['wind_speed']} m/s."
         return {"final_response": response}
 
-    llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
+    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0.2)
     prompt_template = ChatPromptTemplate.from_messages([
         ("system", "You are a friendly weather assistant. Present the weather data to the user in a clean, helpful markdown summary."),
         ("user", "Weather Data: {weather_data}")
@@ -143,6 +143,7 @@ def synthesize_response(state: WeatherState) -> Dict[str, Any]:
 # Conditional routing logic
 def route_after_validation(state: WeatherState):
     if state.get("missing_fields"):
+        log.warning("missing info, ask_user")
         return "ask_user"
     return "search"
 

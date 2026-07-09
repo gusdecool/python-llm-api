@@ -4,6 +4,7 @@ from typing import Optional
 import os
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_litellm import ChatLiteLLM
+from app.log import get_logger
 
 
 class ChooserResult(BaseModel):
@@ -17,7 +18,11 @@ class ChooserResult(BaseModel):
     )
 
 
+log = get_logger('agent-chooser')
+
+
 def choose_agent(prompt: str) -> ChooserResult:
+    log.info('chosing agent')
     if not GEMINI_API_KEY:
         # Fallback if no LLM config: do basic keyword routing
         lower = prompt.lower()
@@ -30,7 +35,7 @@ def choose_agent(prompt: str) -> ChooserResult:
         else:
             return ChooserResult(action="unsupported", direct_response="I can not do that at the moment")
 
-    llm = ChatLiteLLM(model="gemini/gemini-1.5-flash", api_key=GEMINI_API_KEY, temperature=0)
+    llm = ChatLiteLLM(model="gemini/gemini-2.5-flash", api_key=GEMINI_API_KEY, temperature=0, log=False)
 
     structured_llm = llm.with_structured_output(ChooserResult)
 
