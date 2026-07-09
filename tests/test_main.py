@@ -1,7 +1,46 @@
+import os
+import sqlite3
+import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+from app.main import app, get_db, init_db
+
+TEST_DB_URL = "test_items.db"
+
+
+def get_test_db():
+    """
+    Test dependency that yields a connection to the test SQLite database.
+    """
+    conn = sqlite3.connect(TEST_DB_URL)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+# Override the dependency in the app
+app.dependency_overrides[get_db] = get_test_db
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_and_teardown_db():
+    """
+    Fixture to automatically initialize the test database before each test
+    and clean it up afterward.
+    """
+    # Clean setup
+    if os.path.exists(TEST_DB_URL):
+        os.remove(TEST_DB_URL)
+    init_db(TEST_DB_URL)
+    
+    yield
+    
+    # Teardown
+    if os.path.exists(TEST_DB_URL):
+        os.remove(TEST_DB_URL)
 
 
 def test_read_root():
