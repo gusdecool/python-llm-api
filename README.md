@@ -29,6 +29,9 @@ python3 -m venv venv
 # Activate the virtual environment
 # On macOS/Linux:
 source venv/bin/activate
+
+# create an empty sqlite db
+touch main.db
 ```
 
 ### 3. Install Dependencies

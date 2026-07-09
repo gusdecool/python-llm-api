@@ -151,4 +151,6 @@ cython_debug/
 .DS_Store
 
 # sqlite database
-items.db
+*.db
+
+.env
