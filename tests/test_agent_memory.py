@@ -36,21 +36,23 @@ def test_profile_memory_and_isolation():
         
         # Query Budi's name
         ans1 = try_handle_profile(session, "user_budi", "Who am I?")
-        assert ans1 == "You're Budi"
+        assert "Budi" in ans1
         
         # Overwrite with another pattern
         res1_alt = try_handle_profile(session, "user_budi", "remember i'm Budi")
         assert res1_alt == "Ok."
-        assert try_handle_profile(session, "user_budi", "who i am") == "You're Budi"
+        assert "Budi" in try_handle_profile(session, "user_budi", "who i am")
         
         # Query John's name
         ans2 = try_handle_profile(session, "user_john", "Who am I?")
-        assert ans2 == "You're John"
+        assert "John" in ans2
         
         # Query missing user's name
 
+
         ans3 = try_handle_profile(session, "user_unknown", "Who am I?")
-        assert "don't know your name yet" in ans3
+        assert "don't know your name" in ans3
+
 
 
 def test_weather_cache_expiration():

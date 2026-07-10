@@ -59,6 +59,15 @@ def save_memory(session: Session, user_id: str, memory_type: str, query_key: str
     return new_mem
 
 
+from pydantic import BaseModel, Field
+from app.llm_model import get_gemini_2_5_flash_model
+
+
+class ProfileFact(BaseModel):
+    key: str = Field(description="The name of the property or fact in snake_case (e.g., 'name', 'car_preference', 'birthday')")
+    value: str = Field(description="The value or detail to remember (e.g., 'Budi', 'cool cars', 'May 5')")
+
+
 def try_handle_profile(session: Session, user_id: str, prompt: str) -> Optional[str]:
     """
     Intercept identity and profile commands locally to save LLM calls.
@@ -66,28 +75,80 @@ def try_handle_profile(session: Session, user_id: str, prompt: str) -> Optional[
     """
     clean = prompt.strip().lower()
     
-    save_match = re.search(r"\bremember\s+(?:that\s+)?(?:my\s+name\s+is|i\s*am|i'm|iam)\s+([a-zA-Z0-9_\-\s]+)", clean)
-    if not save_match:
-        # Match assertions but not query/question forms like "who am i"
-        if not re.search(r"\bwho\s+(?:am\s+i|i\s*am)\b", clean):
-            save_match = re.search(r"\b(?:my\s+name\s+is|i\s*am|i'm|iam)\s+([a-zA-Z0-9_\-\s]+)", clean)
+    # 1. Check if user is asking to remember something
+    is_remember_cmd = (
+        clean.startswith("remember") or 
+        "remember that" in clean or 
+        "keep in mind" in clean or
+        clean.startswith("my name is") or
+        clean.startswith("i am") or
+        clean.startswith("iam")
+    )
+    
+    if is_remember_cmd:
 
-        
-    if save_match:
-        name = save_match.group(1).strip().title()
-        save_memory(session, user_id, "profile", "name", name)
+        try:
+            llm = get_gemini_2_5_flash_model(temperature=0)
+            structured_llm = llm.with_structured_output(ProfileFact)
+            
+            # Extract key/value using a quick LLM call
+            fact = structured_llm.invoke(
+                f"Extract the core fact/preference to remember from this user input: '{prompt}'."
+            )
+            
+            if fact and fact.key and fact.value:
+                save_memory(session, user_id, "profile", fact.key, fact.value)
+                return "Ok."
+        except Exception as e:
+            log.error(f"Failed to extract memory fact: {str(e)}")
+            
         return "Ok."
         
-    # 2. Check if user is asking who they are
-    if (re.search(r"\bwho\s+(?:am\s+i|i\s*am)\b", clean) or 
-            re.search(r"\bwhat\s+is\s+my\s+name\b", clean) or 
-            re.search(r"\bdo\s+you\s+know\s+my\s+name\b", clean)):
-        mem = get_memory(session, user_id, "profile", "name")
-        if mem:
-            return f"You're {mem.response_val}"
-        return "I don't know your name yet. You can tell me by saying 'Remember my name is Budi'."
+    # 2. Check if user is asking about what we remember about them
+    is_about_user = any(w in clean.split() for w in ["i", "me", "my", "myself", "am"])
+    is_query_cmd = (
+        "who am i" in clean or 
+        "who i am" in clean or
+        "what is my" in clean or 
+        "what do you know about me" in clean or
+        "what do you remember" in clean or
+        "my name" in clean or
+        "do i like" in clean or
+        "do you know" in clean
+    ) and is_about_user
+
+    
+    if is_query_cmd:
+        # Fetch all profile memories for this user
+        statement = select(LLMMemory).where(
+            LLMMemory.user_id == user_id,
+            LLMMemory.memory_type == "profile"
+        )
+        memories = session.exec(statement).all()
         
+        if not memories:
+            return "I don't know your name or details yet. You can tell me to remember something by saying 'Remember that I like cool cars' or 'Remember my name is Budi'."
+            
+        # Format the context
+        context_lines = []
+        for m in memories:
+            context_lines.append(f"- {m.query_key}: {m.response_val}")
+        context = "\n".join(context_lines)
+        
+        try:
+            llm = get_gemini_2_5_flash_model(temperature=0.2)
+            prompt_str = (
+                "You are a helpful assistant with access to the user's stored profile details/memories.\n"
+                f"Here are the stored facts about the user:\n{context}\n\n"
+                f"Answer the user's question: '{prompt}' using these facts. Keep it short and natural."
+            )
+            response = llm.invoke(prompt_str).content
+            return response
+        except Exception as e:
+            log.error(f"Failed to answer profile query: {str(e)}")
+            
     return None
+
 
 
 

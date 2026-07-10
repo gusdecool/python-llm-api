@@ -53,6 +53,11 @@ uvicorn app.main:app --reload
 ```
 By default, the server runs on `http://127.0.0.1:8000`.
 
+### 5. Running as CLI (recommended)
+```bash
+python -m cli
+```
+
 ---
 
 ## Interactive API Documentation
