@@ -1,7 +1,7 @@
 from app.app_exception import AppException
 from app.log import get_logger
 import sys
-from app.agents import choose_agent, car_hire_agent, weather_agent, generate_image_agent
+from app.agents import choose_agent, car_hire_agent, weather_agent, generate_image_agent, marketing_agent
 from sqlmodel import Session
 from app.db import engine, init_db
 
@@ -112,6 +112,48 @@ def run_weather_flow(initial_prompt: str, session: Session = None) -> None:
     print(f"\nAgent: {result.get('final_response') or 'Search complete.'}")
 
 
+def run_marketing_flow(initial_prompt: str, session: Session = None) -> None:
+    state = {
+        "prompt": initial_prompt,
+        "topic": None,
+        "drafts": None,
+        "approved_option": None,
+        "final_response": None,
+        "next_question": None
+    }
+    config = {
+        "configurable": {
+            "session": session,
+            "user_id": "default_user"
+        }
+    } if session else {}
+    
+    result = marketing_agent.invoke(state, config=config)
+    
+    while result.get("next_question"):
+        print(f"\nAgent: {result['next_question']}")
+        try:
+            answer = input("You: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nGoodbye!")
+            sys.exit(0)
+            
+        if not answer:
+            continue
+            
+        state = {
+            "prompt": answer,
+            "topic": result.get("topic"),
+            "drafts": result.get("drafts"),
+            "approved_option": result.get("approved_option"),
+            "final_response": None,
+            "next_question": None
+        }
+        result = marketing_agent.invoke(state, config=config)
+        
+    print(f"\nAgent: {result.get('final_response') or 'Campaign finalized.'}")
+
+
 def main() -> None:
     init_db()
     print("==================================================")
@@ -149,6 +191,9 @@ def main() -> None:
                 elif choice.action == "generate_image_agent":
                     print("\n[Routing to Generate Image Agent...]")
                     run_generate_image_flow(prompt, session=session)
+                elif choice.action == "marketing_agent":
+                    print("\n[Routing to Marketing Agent...]")
+                    run_marketing_flow(prompt, session=session)
                 elif choice.action == "unsupported":
                     print(f"\nAgent: {choice.direct_response}")
                 else:

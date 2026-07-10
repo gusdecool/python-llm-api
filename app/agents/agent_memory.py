@@ -150,8 +150,6 @@ def try_handle_profile(session: Session, user_id: str, prompt: str) -> Optional[
     return None
 
 
-
-
 def check_prompt_cache(session: Session, user_id: str, prompt: str) -> Optional[dict]:
     """
     Check if the user has asked this exact/similar prompt recently.

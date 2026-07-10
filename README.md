@@ -58,6 +58,52 @@ By default, the server runs on `http://127.0.0.1:8000`.
 python -m cli
 ```
 
+### 6. As MCP server
+
+#### Option 1: Standard Input/Output (stdio) - Best for local use
+To run the server over stdio:
+```bash
+./venv/bin/python mcp_server.py
+```
+
+**Claude Desktop Configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):**
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "command": "/Users/budiarsana/Developer/gusdecool/python-llm-api/venv/bin/python",
+      "args": [
+        "/Users/budiarsana/Developer/gusdecool/python-llm-api/mcp_server.py"
+      ]
+    }
+  }
+}
+```
+
+#### Option 2: Server-Sent Events (SSE) - Best for deployment / URL-based access
+To start the server over HTTP/SSE (exposed via a URL on `http://localhost:8000/sse`):
+```bash
+python -m mcp_server sse
+```
+
+**Claude Desktop Configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):**
+```json
+{
+  "mcpServers": {
+    "agent-orchestrator": {
+      "url": "http://localhost:8000/sse"
+    }
+  }
+}
+```
+
+**Cursor Configuration:**
+Go to **Settings > Features > MCP**:
+- Click **+ Add New MCP Server**
+- Name: `agent-orchestrator`
+- Type: `SSE`
+- URL: `http://localhost:8000/sse`
+
 ---
 
 ## Interactive API Documentation
