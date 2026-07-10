@@ -1,9 +1,23 @@
 from app.app_exception import AppException
 from app.log import get_logger
 import sys
-from app.agents import choose_agent, car_hire_agent, weather_agent
+from app.agents import choose_agent, car_hire_agent, weather_agent, generate_image_agent
 
 log = get_logger("cli-main")
+
+def run_generate_image_flow(initial_prompt: str) -> None:
+    state = {
+        "prompt": initial_prompt,
+        "safe_prompt": None,
+        "is_safe": None,
+        "rejection_reason": None,
+        "image_bytes": None,
+        "image_url": None,
+        "final_response": None
+    }
+    result = generate_image_agent.invoke(state)
+    print(f"\nAgent: {result.get('final_response') or 'Image generation complete.'}")
+
 
 def run_car_hire_flow(initial_prompt: str) -> None:
     state = {
@@ -115,6 +129,9 @@ def main() -> None:
             elif choice.action == "car_hire_agent":
                 print("\n[Routing to Car Hire Agent...]")
                 run_car_hire_flow(prompt)
+            elif choice.action == "generate_image_agent":
+                print("\n[Routing to Generate Image Agent...]")
+                run_generate_image_flow(prompt)
             elif choice.action == "unsupported":
                 print(f"\nAgent: {choice.direct_response}")
             else:
@@ -122,9 +139,11 @@ def main() -> None:
         except AppException as e:
             # print the error message and ask user input again
             print("\nAgent: " + e.message)
-            prompt = input("\nYou: ").strip()
+            # let the process continue to ask for another input
+            continue
 
 
 
 if __name__ == "__main__":
     main()
+

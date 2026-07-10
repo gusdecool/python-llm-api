@@ -5,7 +5,7 @@ from sqlmodel import Session, select, col
 from pydantic import BaseModel, Field
 from app.db import get_session
 from app.models import LLMJob
-from app.agents import car_hire_agent, weather_agent, choose_agent
+from app.agents import car_hire_agent, weather_agent, choose_agent, generate_image_agent
 from app.langfuse import get_langfuse_handler
 
 
@@ -75,7 +75,34 @@ def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):
             job.response = f"Weather agent failed: {str(e)}"
             job.responded_at = datetime.utcnow()
             job.state = {"agent": "weather_agent"}
+    elif choice.action == "generate_image_agent":
+        initial_state = {
+            "prompt": payload.prompt,
+            "safe_prompt": None,
+            "is_safe": None,
+            "rejection_reason": None,
+            "image_bytes": None,
+            "image_url": None,
+            "final_response": None
+        }
+        try:
+            result = generate_image_agent.invoke(initial_state, config=config)
+            job.status = "done"
+            job.response = result.get("final_response") or "Done"
+            job.responded_at = datetime.utcnow()
+            job.state = {
+                "agent": "generate_image_agent",
+                "is_safe": result.get("is_safe"),
+                "rejection_reason": result.get("rejection_reason"),
+                "image_url": result.get("image_url")
+            }
+        except Exception as e:
+            job.status = "error"
+            job.response = f"Image generation agent failed: {str(e)}"
+            job.responded_at = datetime.utcnow()
+            job.state = {"agent": "generate_image_agent"}
     else:
+
         # Default to car_hire_agent
         initial_state = {
             "prompt": payload.prompt,
