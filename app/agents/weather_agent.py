@@ -99,10 +99,38 @@ def validate_parameters(state: WeatherState) -> Dict[str, Any]:
     return {"missing_fields": [], "next_question": None}
 
 
+import json
+from app.agents.agent_memory import get_memory, save_memory
+from datetime import datetime, timedelta
+from langchain_core.runnables import RunnableConfig
+
 # Node 3: Search weather (API or Mock)
-def search_weather(state: WeatherState) -> Dict[str, Any]:
+def search_weather(state: WeatherState, config: RunnableConfig = None) -> Dict[str, Any]:
     location = state["location"]
     
+    session = None
+    user_id = "default_user"
+    if config and isinstance(config, dict) and "configurable" in config:
+        session = config["configurable"].get("session")
+        user_id = config["configurable"].get("user_id", "default_user")
+    elif config and hasattr(config, "get") and config.get("configurable"):
+        session = config.get("configurable").get("session")
+        user_id = config.get("configurable").get("user_id", "default_user")
+
+
+    if session and location:
+        loc_key = location.lower().strip()
+        cached = get_memory(session, user_id, "weather_data", loc_key)
+        if cached:
+            age = datetime.utcnow() - cached.created_at
+            if age < timedelta(minutes=15):
+                log.info(f"Using cached weather_data for {loc_key} (age: {age})")
+                try:
+                    weather_data = json.loads(cached.response_val)
+                    return {"weather_data": weather_data}
+                except Exception:
+                    log.error("Failed to parse cached weather data JSON")
+
     # Try calling OpenWeatherMap API
     if OPEN_WEATHER_API_KEY:
         try:
@@ -110,18 +138,26 @@ def search_weather(state: WeatherState) -> Dict[str, Any]:
             response = httpx.get(url, timeout=10.0)
             if response.status_code == 200:
                 data = response.json()
-                return {"weather_data": {
+                weather_data = {
                     "temp": data["main"]["temp"],
                     "feels_like": data["main"]["feels_like"],
                     "condition": data["weather"][0]["description"],
                     "humidity": data["main"]["humidity"],
                     "wind_speed": data["wind"]["speed"],
                     "city": data["name"]
-                }}
+                }
+                
+                # Save to cache
+                if session and location:
+                    loc_key = location.lower().strip()
+                    save_memory(session, user_id, "weather_data", loc_key, json.dumps(weather_data))
+                    
+                return {"weather_data": weather_data}
         except Exception:
             raise AppException("failed to call open weather API, please check if service functional")
     else:
         raise AppException("please set OPEN_WEATHER_API_KEY in env")
+
 
 
 # Node 4: Synthesize response

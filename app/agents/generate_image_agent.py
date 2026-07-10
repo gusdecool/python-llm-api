@@ -180,7 +180,10 @@ def upload_to_s3(state: GenerateImageState) -> Dict[str, Any]:
         raise AppException(f"Failed to upload image to S3: {str(e)}")
 
 
-def format_final_response(state: GenerateImageState) -> Dict[str, Any]:
+from langchain_core.runnables import RunnableConfig
+
+
+def format_final_response(state: GenerateImageState, config: RunnableConfig = None) -> Dict[str, Any]:
     """
     Formulate the final JSON response
     """
@@ -197,7 +200,28 @@ def format_final_response(state: GenerateImageState) -> Dict[str, Any]:
             "url": state.get("image_url")
         }
 
-    return {"final_response": json.dumps(response_json, indent=4)}
+    final_resp = json.dumps(response_json, indent=4)
+
+    # Save to prompt-to-image cache if session is provided
+    session = None
+    user_id = "default_user"
+    if config and isinstance(config, dict) and "configurable" in config:
+        session = config["configurable"].get("session")
+        user_id = config["configurable"].get("user_id", "default_user")
+    elif config and hasattr(config, "get") and config.get("configurable"):
+        session = config.get("configurable").get("session")
+        user_id = config.get("configurable").get("user_id", "default_user")
+
+
+    if session and state.get("is_safe") and state.get("image_url"):
+        try:
+            from app.agents.agent_memory import save_memory
+            save_memory(session, user_id, "image", state["prompt"], final_resp)
+        except Exception as e:
+            log.error(f"Failed to save image response to cache: {str(e)}")
+
+    return {"final_response": final_resp}
+
 
 
 def route_after_safety(state: GenerateImageState) -> str:

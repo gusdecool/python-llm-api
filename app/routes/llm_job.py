@@ -29,8 +29,8 @@ def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):
     session.commit()
     session.refresh(job)
 
-    # Route using agent_chooser
-    choice = choose_agent(payload.prompt)
+    # Route using agent_chooser with session and user isolation
+    choice = choose_agent(payload.prompt, session=session, user_id="default_api_user")
 
     if choice.action == "direct_answer" or choice.action == "unsupported":
         job.status = "done"
@@ -42,9 +42,15 @@ def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):
         session.refresh(job)
         return job
 
-    # Invoke appropriate agent with Langfuse observability callbacks
+    # Invoke appropriate agent with Langfuse observability callbacks and DB sessions
     handler = get_langfuse_handler()
-    config = {"callbacks": [handler]} if handler else {}
+    config = {
+        "callbacks": [handler] if handler else [],
+        "configurable": {
+            "session": session,
+            "user_id": "default_api_user"
+        }
+    }
 
     if choice.action == "weather_agent":
         initial_state = {

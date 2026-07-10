@@ -8,6 +8,8 @@ from langchain_litellm import ChatLiteLLM
 from app.log import get_logger
 from app.langfuse import get_langfuse_handler
 from app.util import get_session_id
+from sqlmodel import Session
+from app.agents.agent_memory import try_handle_profile, check_prompt_cache, save_memory
 
 
 class ChooserResult(BaseModel):
@@ -24,7 +26,7 @@ class ChooserResult(BaseModel):
 log = get_logger('agent-chooser')
 
 
-def choose_agent(prompt: str) -> ChooserResult:
+def choose_agent(prompt: str, session: Optional[Session] = None, user_id: str = "default_user") -> ChooserResult:
     """
     Choose AI agent based on prompt.
     If the request is can be answered directly, use 'direct_answer' action.
@@ -32,10 +34,24 @@ def choose_agent(prompt: str) -> ChooserResult:
 
     Args:
         prompt: User prompt
+        session: SQLModel database session
+        user_id: Unique user identifier for isolation
 
     Returns:
         ChooserResult with action and direct_response
     """
+    if session:
+        # 1. Intercept profile query / updates locally (no LLM call)
+        profile_response = try_handle_profile(session, user_id, prompt)
+        if profile_response is not None:
+            log.info("Handled profile memory request locally")
+            return ChooserResult(action="direct_answer", direct_response=profile_response)
+
+        # 2. Check general caches (exact prompt matches for weather, image, direct_answer)
+        cached = check_prompt_cache(session, user_id, prompt)
+        if cached:
+            log.info(f"Handled prompt cache request locally for {cached['action']}")
+            return ChooserResult(action=cached["action"], direct_response=cached["response"])
 
     log.info('chosing agent')
     llm = get_gemini_2_5_flash_model(temperature=0)
@@ -55,7 +71,6 @@ def choose_agent(prompt: str) -> ChooserResult:
         ("user", "{prompt}")
     ])
 
-
     chain = prompt_template | structured_llm
     try:
         handler = get_langfuse_handler()
@@ -71,6 +86,12 @@ def choose_agent(prompt: str) -> ChooserResult:
 
         if result.action == "unsupported":
             result.direct_response = "I can not do that at the moment"
+        
+        # Save direct answers to cache if session is provided
+        if session and result.action == "direct_answer" and result.direct_response:
+            save_memory(session, user_id, "direct_answer", prompt, result.direct_response)
+
         return result
     except Exception:
         return ChooserResult(action="unsupported", direct_response="I can not do that at the moment")
+

@@ -2,6 +2,12 @@
 
 A clean, standard Python FastAPI project showcasing basic HTTP GET and POST request and response handling, with automated validation via Pydantic.
 
+## Features
+1. Multi agentic agent, there is an Agentic AI agent that will chose which agent to use depend on the task.
+2. Generate image agent
+3. Weather agent
+4. Memory agent (remember who you are or what you asked for). Good for saving memory or API call.
+
 ## Dependencies
 
 The project defines the following packages in `requirements.txt`:

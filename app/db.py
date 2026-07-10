@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlmodel import Field, SQLModel, create_engine, Session, select
 from app.config import DATABASE_URL
 from app.log import logger
-from app.models import LLMJob
+from app.models import LLMJob, LLMMemory
 
 
 # Create the SQLAlchemy engine for SQLModel
@@ -10,13 +10,15 @@ from app.models import LLMJob
 engine = create_engine(
     DATABASE_URL, 
     connect_args={"check_same_thread": False} if DATABASE_URL and DATABASE_URL.startswith("sqlite") else {},
-    echo=True  # Prints generated SQL to console (good for development)
+    echo=False  # Set to True to print generated SQL to console
 )
+
 
 
 def init_db() -> None:
     """
     Initializes the database, creating all tables and seeding data if empty.
+    This is safe function, can be called multiple times.
     """
     # Create tables
     SQLModel.metadata.create_all(engine)
