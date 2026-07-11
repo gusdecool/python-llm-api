@@ -21,6 +21,7 @@ class LLMJobUpdate(BaseModel):
     response: Optional[str] = Field(None, description="Response from the LLM")
     answer: Optional[str] = Field(None, description="User's answer to the follow-up question")
 
+
 @router.post("", response_model=LLMJob, status_code=status.HTTP_201_CREATED)
 def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):
     # Initialize the job in database

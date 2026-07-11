@@ -32,8 +32,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.include_router(llm_job_router)
 
+app.include_router(llm_job_router)
 
 
 @app.get("/", tags=["Root"])
@@ -55,78 +55,4 @@ def db_init() -> dict:
     #     init_db(conn)
 
     return {"message": "Database initialized successfully."}
-
-
-# def get_db():
-#     """
-#     FastAPI dependency that yields a database connection.
-#     """
-#     conn = sqlite3.connect(DATABASE_URL)
-#     conn.row_factory = sqlite3.Row
-#     try:
-#         yield conn
-#     finally:
-#         conn.close()
-
-
-# Pydantic models for request validation and response schema
-# class ItemBase(BaseModel):
-#     name: str = Field(..., min_length=1, max_length=100, description="The name of the item")
-#     description: Optional[str] = Field(None, max_length=250, description="The description of the item")
-#     price: float = Field(..., gt=0, description="The price of the item, must be greater than zero")
-#     tax: Optional[float] = Field(None, ge=0, description="The tax applied to the item")
-
-
-# class ItemCreate(ItemBase):
-#     pass
-
-
-# class ItemResponse(ItemBase):
-#     id: int = Field(..., description="The unique identifier of the item")
-
-
-
-
-# @app.get("/items", response_model=List[ItemResponse], tags=["Items"])
-# def get_items(limit: int = 10, conn: sqlite3.Connection = Depends(get_db)) -> List[dict]:
-#     """
-#     Retrieve a list of items.
-    
-#     Query parameter:
-#     - **limit**: Maximum number of items to return (default is 10)
-#     """
-#     log.info("Fetching items up to limit: %d", limit)
-#     cursor = conn.cursor()
-#     cursor.execute("SELECT id, name, description, price, tax FROM items LIMIT ?", (limit,))
-#     rows = cursor.fetchall()
-#     return [dict(row) for row in rows]
-
-
-# @app.post(
-#     "/items",
-#     response_model=ItemResponse,
-#     status_code=status.HTTP_201_CREATED,
-#     tags=["Items"]
-# )
-# def create_item(item: ItemCreate, conn: sqlite3.Connection = Depends(get_db)) -> dict:
-#     """
-#     Create a new item.
-    
-#     Accepts validated request body, assigns a new ID, saves in database,
-#     and returns the created item.
-#     """
-#     log.info("Creating a new item: %s", item.name)
-#     cursor = conn.cursor()
-#     cursor.execute(
-#         "INSERT INTO items (name, description, price, tax) VALUES (?, ?, ?, ?)",
-#         (item.name, item.description, item.price, item.tax)
-#     )
-#     conn.commit()
-#     new_id = cursor.lastrowid
-    
-#     cursor.execute("SELECT id, name, description, price, tax FROM items WHERE id = ?", (new_id,))
-#     row = cursor.fetchone()
-#     return dict(row)
-
-
 

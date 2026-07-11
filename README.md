@@ -5,8 +5,8 @@ A clean, python implementation to orchestrated multi Agentic AI with LangChain/L
 ## Features
 1. Multi Agents, system will chose which AI agent suitable for the tasks.
 2. Memory capability.
-3. Model agnostic, easy switch between model that suit the task.
-4. Multi platform: CLI, MCP (connect to your LLM), RESTful API.
+3. Model agnostic, easily switch between model that suit the task.
+4. Multi platform: CLI, MCP Server, RESTful API.
 
 ## Available Agents
 - `agent_chooser`: decide which agent specialized agent to use. If can answer directly (e.g: simple question, answer directly)
