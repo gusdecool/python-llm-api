@@ -51,8 +51,35 @@ def setup_and_teardown_db():
 
 
 def test_choose_agent_routing():
-    # Test keyword matching fallback
-    with patch("app.agents.agent_chooser.GEMINI_API_KEY", None):
+    from unittest.mock import patch, MagicMock
+    from app.agents.agent_chooser import ChooserResult
+
+    mock_llm = MagicMock()
+    mock_structured = MagicMock()
+    mock_llm.with_structured_output.return_value = mock_structured
+
+    def mock_structured_invoke(input_data, *args, **kwargs):
+        prompt_text = ""
+        if hasattr(input_data, "to_messages"):
+            prompt_text = input_data.to_messages()[-1].content
+        elif isinstance(input_data, dict):
+            prompt_text = input_data.get("prompt", "")
+        else:
+            prompt_text = str(input_data)
+
+        if "car hire" in prompt_text or "car rental" in prompt_text:
+            return ChooserResult(action="car_hire_agent")
+        elif "weather" in prompt_text:
+            return ChooserResult(action="weather_agent")
+        elif "E=mc2" in prompt_text:
+            return ChooserResult(action="direct_answer", direct_response="E=mc2 is energy equals mass times speed of light squared.")
+        else:
+            return ChooserResult(action="unsupported", direct_response="I can not do that at the moment")
+
+    mock_structured.invoke.side_effect = mock_structured_invoke
+    mock_structured.side_effect = mock_structured_invoke
+
+    with patch("app.agents.agent_chooser.get_gemini_2_5_flash_model", return_value=mock_llm):
         r1 = choose_agent("find me car hire in Sydney")
         assert r1.action == "car_hire_agent"
         

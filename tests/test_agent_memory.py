@@ -25,33 +25,59 @@ def setup_db():
 
 
 def test_profile_memory_and_isolation():
-    with Session(engine) as session:
-        # Save Budi's name using different variations
-        res1 = try_handle_profile(session, "user_budi", "remember iam Budi")
-        assert res1 == "Ok."
-        
-        # Save John's name
-        res2 = try_handle_profile(session, "user_john", "My name is John")
-        assert res2 == "Ok."
-        
-        # Query Budi's name
-        ans1 = try_handle_profile(session, "user_budi", "Who am I?")
-        assert "Budi" in ans1
-        
-        # Overwrite with another pattern
-        res1_alt = try_handle_profile(session, "user_budi", "remember i'm Budi")
-        assert res1_alt == "Ok."
-        assert "Budi" in try_handle_profile(session, "user_budi", "who i am")
-        
-        # Query John's name
-        ans2 = try_handle_profile(session, "user_john", "Who am I?")
-        assert "John" in ans2
-        
-        # Query missing user's name
+    from unittest.mock import patch, MagicMock
+    from app.agents.agent_memory import ProfileFact
 
+    mock_llm = MagicMock()
+    mock_structured = MagicMock()
+    mock_llm.with_structured_output.return_value = mock_structured
 
-        ans3 = try_handle_profile(session, "user_unknown", "Who am I?")
-        assert "don't know your name" in ans3
+    def mock_structured_invoke(prompt_text, *args, **kwargs):
+        if "Budi" in prompt_text:
+            return ProfileFact(key="name", value="Budi")
+        elif "John" in prompt_text:
+            return ProfileFact(key="name", value="John")
+        return None
+
+    def mock_llm_invoke(prompt_str, *args, **kwargs):
+        resp = MagicMock()
+        if "Budi" in prompt_str:
+            resp.content = "Your name is Budi."
+        elif "John" in prompt_str:
+            resp.content = "Your name is John."
+        else:
+            resp.content = "I don't know your name."
+        return resp
+
+    mock_structured.invoke.side_effect = mock_structured_invoke
+    mock_llm.invoke.side_effect = mock_llm_invoke
+
+    with patch("app.agents.agent_memory.get_gemini_2_5_flash_model", return_value=mock_llm):
+        with Session(engine) as session:
+            # Save Budi's name using different variations
+            res1 = try_handle_profile(session, "user_budi", "remember iam Budi")
+            assert res1 == "Ok."
+            
+            # Save John's name
+            res2 = try_handle_profile(session, "user_john", "My name is John")
+            assert res2 == "Ok."
+            
+            # Query Budi's name
+            ans1 = try_handle_profile(session, "user_budi", "Who am I?")
+            assert "Budi" in ans1
+            
+            # Overwrite with another pattern
+            res1_alt = try_handle_profile(session, "user_budi", "remember i'm Budi")
+            assert res1_alt == "Ok."
+            assert "Budi" in try_handle_profile(session, "user_budi", "who i am")
+            
+            # Query John's name
+            ans2 = try_handle_profile(session, "user_john", "Who am I?")
+            assert "John" in ans2
+            
+            # Query missing user's name
+            ans3 = try_handle_profile(session, "user_unknown", "Who am I?")
+            assert "don't know your name" in ans3
 
 
 
