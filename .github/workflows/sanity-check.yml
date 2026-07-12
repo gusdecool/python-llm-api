@@ -24,6 +24,22 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Set up Database and Env
+      run: |
+        touch main.db
+        cat <<EOF > .env
+        DATABASE_URL=sqlite:///main.db
+        GEMINI_API_KEY=mock_gemini_api_key
+        LANGFUSE_SECRET_KEY=mock_langfuse_secret_key
+        LANGFUSE_PUBLIC_KEY=mock_langfuse_public_key
+        LANGFUSE_BASE_URL=https://cloud.langfuse.com
+        OPEN_WEATHER_API_KEY=mock_open_weather_api_key
+        AWS_ACCESS_KEY_ID=mock_aws_access_key_id
+        AWS_SECRET_ACCESS_KEY=mock_aws_secret_access_key
+        AWS_REGION=us-east-1
+        AWS_S3_BUCKET=mock-s3-bucket
+        EOF
+
     - name: Run tests
       run: |
         PYTHONPATH=. pytest
