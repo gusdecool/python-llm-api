@@ -25,8 +25,8 @@ A clean, python implementation to orchestrated multi Agentic AI with LangChain/L
 Run the following commands inside the project:
 
 ```bash
-# Create a virtual environment
-python3 -m venv venv
+# Create a virtual environment using uv
+uv venv venv
 
 # Activate the virtual environment
 # On macOS/Linux:
@@ -40,8 +40,8 @@ Create the `.env` file, see file [config.py](./app/config.py) for env used.
 
 ### 3. Install Dependencies
 ```bash
-pip install --upgrade pip
-pip install -r requirements.txt
+# Synchronize virtual environment with pyproject.toml dependencies
+uv sync
 ```
 
 ### 4. Running the API Server (REST)
@@ -118,7 +118,7 @@ PYTHONPATH=. pytest
 
 ## Dependencies
 
-The project defines the following packages in `requirements.txt`:
+The project defines the following packages in `pyproject.toml`:
 
 1. **`fastapi`**: The core web framework for building APIs with Python 3.8+ based on standard Python type hints. It provides high performance (on par with NodeJS and Go), rapid coding, and automatic interactive Swagger/ReDoc documentation.
 2. **`uvicorn[standard]`**: An ASGI (Asynchronous Server Gateway Interface) web server implementation for Python. FastAPI is built on ASGI standard, and `uvicorn` acts as the server to run the FastAPI application. The `[standard]` extra installs high-performance loop dependencies like `uvloop` and `httptools`.
