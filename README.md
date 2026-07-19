@@ -3,16 +3,28 @@
 A clean, python implementation to orchestrated multi Agentic AI with LangChain/LangGraph & Langfuse (observability).
 
 ## Features
-1. Multi Agents, system will chose which AI agent suitable for the tasks.
+1. Multi Agents, the system will choose which AI agent is suitable for the tasks.
 2. Memory capability.
-3. Model agnostic, easily switch between model that suit the task.
+3. Model agnostic, easily switch between models that suits the task.
 4. Multi platform: CLI, MCP Server, RESTful API.
+5. On-demand RAG knowledge base: add any URL and query its content afterward.
 
 ## Available Agents
 - `agent_chooser`: decide which agent specialized agent to use. If can answer directly (e.g: simple question, answer directly)
 - `agent_memory`: agent that remember the previous question and use it as base answer. Not to be confused with full RAG capability.
 - `weather_agent`: agent that can answer weather related question, powered by Open Weather API
 - `image_agent`: agent that can generate image.
+- `rag_ingest_agent`: scrapes a given URL, chunks and embeds its content, and stores it in the knowledge base (SQLite). Skips re-scraping if the URL was already added.
+- `rag_query_agent`: answers questions by retrieving the most relevant chunks from the knowledge base (via embedding similarity) and synthesizing an answer from them. Replies that it doesn't know if nothing relevant has been added yet.
+
+### RAG Knowledge Base Example
+```
+You: Add https://www.kayak.co.id/ to rag knowledge base
+Agent: Added 'https://www.kayak.co.id/' to the knowledge base (12 chunks indexed).
+
+You: What is kayak.co.id?
+Agent: Kayak.co.id is a travel search engine that compares prices across... (Source: https://www.kayak.co.id/)
+```
 
 ---
 
@@ -36,7 +48,7 @@ source venv/bin/activate
 touch main.db
 ```
 
-Create the `.env` file, see file [config.py](./app/config.py) for env used.
+Create the `.env` file, see the file [config.py](./app/config.py) for env used.
 
 ### 3. Install Dependencies
 ```bash
@@ -124,4 +136,6 @@ The project defines the following packages in `pyproject.toml`:
 2. **`uvicorn[standard]`**: An ASGI (Asynchronous Server Gateway Interface) web server implementation for Python. FastAPI is built on ASGI standard, and `uvicorn` acts as the server to run the FastAPI application. The `[standard]` extra installs high-performance loop dependencies like `uvloop` and `httptools`.
 3. **`pydantic`**: Data validation and settings management using Python type annotations. FastAPI uses Pydantic to parse and validate request JSON payloads, and serialize response objects.
 4. **`pytest`**: A robust testing framework for writing clean, readable, and scalable unit tests.
-5. **`httpx`**: A next-generation HTTP client for Python. It is used in unit tests alongside FastAPI's `TestClient` to make asynchronous/synchronous HTTP requests to the application.
+5. **`httpx`**: A next-generation HTTP client for Python. It is used in unit tests alongside FastAPI's `TestClient` to make asynchronous/synchronous HTTP requests to the application. Also used by `rag_ingest_agent` to fetch page content.
+6. **`beautifulsoup4`**: HTML parser used by `rag_ingest_agent` to strip tags and extract readable text from scraped pages.
+7. **`langchain-text-splitters`**: Splits scraped page text into overlapping chunks before embedding, for the RAG knowledge base.
