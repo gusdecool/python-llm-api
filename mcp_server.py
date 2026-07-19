@@ -4,7 +4,7 @@ from mcp.server.fastmcp import FastMCP
 from sqlmodel import Session
 from app.db import engine, init_db
 from app.models import LLMJob
-from app.agents import choose_agent, weather_agent, generate_image_agent, marketing_agent
+from app.agents import choose_agent, weather_agent, generate_image_agent, marketing_agent, rag_ingest_agent, rag_query_agent
 
 
 # 1. Initialize the FastMCP Server
@@ -79,6 +79,25 @@ def submit_agent_task(prompt: str) -> str:
                     "next_question": None
                 }
                 result = marketing_agent.invoke(initial_state, config=config)
+            elif choice.action == "rag_ingest_agent":
+                initial_state = {
+                    "prompt": prompt,
+                    "url": None,
+                    "title": None,
+                    "scraped_text": None,
+                    "already_exists": None,
+                    "chunk_count": None,
+                    "final_response": None
+                }
+                result = rag_ingest_agent.invoke(initial_state, config=config)
+            elif choice.action == "rag_query_agent":
+                initial_state = {
+                    "prompt": prompt,
+                    "query_embedding": None,
+                    "retrieved_chunks": None,
+                    "final_response": None
+                }
+                result = rag_query_agent.invoke(initial_state, config=config)
             else:
                 # Unsupported action inside this MCP context
                 job.status = "error"
@@ -100,7 +119,7 @@ def submit_agent_task(prompt: str) -> str:
 
             job.state = {
                 "agent": choice.action,
-                **{k: v for k, v in result.items() if k not in ("prompt", "final_response", "next_question") and not isinstance(v, bytes)}
+                **{k: v for k, v in result.items() if k not in ("prompt", "final_response", "next_question", "query_embedding", "scraped_text") and not isinstance(v, bytes)}
             }
             session.add(job)
             session.commit()

@@ -1,7 +1,7 @@
 from app.app_exception import AppException
 from app.log import get_logger
 import sys
-from app.agents import choose_agent, car_hire_agent, weather_agent, generate_image_agent, marketing_agent
+from app.agents import choose_agent, car_hire_agent, weather_agent, generate_image_agent, marketing_agent, rag_ingest_agent, rag_query_agent
 from sqlmodel import Session
 from app.db import engine, init_db
 
@@ -154,6 +154,45 @@ def run_marketing_flow(initial_prompt: str, session: Session = None) -> None:
     print(f"\nAgent: {result.get('final_response') or 'Campaign finalized.'}")
 
 
+def run_rag_ingest_flow(initial_prompt: str, session: Session = None) -> None:
+    state = {
+        "prompt": initial_prompt,
+        "url": None,
+        "title": None,
+        "scraped_text": None,
+        "already_exists": None,
+        "chunk_count": None,
+        "final_response": None
+    }
+    config = {
+        "configurable": {
+            "session": session,
+            "user_id": "default_user"
+        }
+    } if session else {}
+
+    result = rag_ingest_agent.invoke(state, config=config)
+    print(f"\nAgent: {result.get('final_response') or 'Done.'}")
+
+
+def run_rag_query_flow(initial_prompt: str, session: Session = None) -> None:
+    state = {
+        "prompt": initial_prompt,
+        "query_embedding": None,
+        "retrieved_chunks": None,
+        "final_response": None
+    }
+    config = {
+        "configurable": {
+            "session": session,
+            "user_id": "default_user"
+        }
+    } if session else {}
+
+    result = rag_query_agent.invoke(state, config=config)
+    print(f"\nAgent: {result.get('final_response') or 'Done.'}")
+
+
 def main() -> None:
     init_db()
     print("==================================================")
@@ -194,6 +233,12 @@ def main() -> None:
                 elif choice.action == "marketing_agent":
                     print("\n[Routing to Marketing Agent...]")
                     run_marketing_flow(prompt, session=session)
+                elif choice.action == "rag_ingest_agent":
+                    print("\n[Routing to RAG Ingest Agent...]")
+                    run_rag_ingest_flow(prompt, session=session)
+                elif choice.action == "rag_query_agent":
+                    print("\n[Routing to RAG Query Agent...]")
+                    run_rag_query_flow(prompt, session=session)
                 elif choice.action == "unsupported":
                     print(f"\nAgent: {choice.direct_response}")
                 else:
