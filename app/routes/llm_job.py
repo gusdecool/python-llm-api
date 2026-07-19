@@ -5,7 +5,7 @@ from sqlmodel import Session, select, col
 from pydantic import BaseModel, Field
 from app.db import get_session
 from app.models import LLMJob
-from app.agents import car_hire_agent, weather_agent, choose_agent, generate_image_agent
+from app.agents import car_hire_agent, weather_agent, choose_agent, generate_image_agent, rag_ingest_agent, rag_query_agent
 from app.langfuse import get_langfuse_handler
 
 
@@ -108,6 +108,49 @@ def create_job(payload: LLMJobCreate, session: Session = Depends(get_session)):
             job.response = f"Image generation agent failed: {str(e)}"
             job.responded_at = datetime.utcnow()
             job.state = {"agent": "generate_image_agent"}
+    elif choice.action == "rag_ingest_agent":
+        initial_state = {
+            "prompt": payload.prompt,
+            "url": None,
+            "title": None,
+            "scraped_text": None,
+            "already_exists": None,
+            "chunk_count": None,
+            "final_response": None
+        }
+        try:
+            result = rag_ingest_agent.invoke(initial_state, config=config)
+            job.status = "done"
+            job.response = result.get("final_response") or "Done"
+            job.responded_at = datetime.utcnow()
+            job.state = {
+                "agent": "rag_ingest_agent",
+                "url": result.get("url"),
+                "chunk_count": result.get("chunk_count")
+            }
+        except Exception as e:
+            job.status = "error"
+            job.response = f"RAG ingest agent failed: {str(e)}"
+            job.responded_at = datetime.utcnow()
+            job.state = {"agent": "rag_ingest_agent"}
+    elif choice.action == "rag_query_agent":
+        initial_state = {
+            "prompt": payload.prompt,
+            "query_embedding": None,
+            "retrieved_chunks": None,
+            "final_response": None
+        }
+        try:
+            result = rag_query_agent.invoke(initial_state, config=config)
+            job.status = "done"
+            job.response = result.get("final_response") or "Done"
+            job.responded_at = datetime.utcnow()
+            job.state = {"agent": "rag_query_agent"}
+        except Exception as e:
+            job.status = "error"
+            job.response = f"RAG query agent failed: {str(e)}"
+            job.responded_at = datetime.utcnow()
+            job.state = {"agent": "rag_query_agent"}
     else:
 
         # Default to car_hire_agent
